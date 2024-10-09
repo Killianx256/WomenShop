@@ -1,3 +1,6 @@
+package org.studentfx.womenshop.backend;
+
 public interface Discount {
-    void applyDiscount();
+    void applyDiscount(double discountPercentage);
+    void removeDiscount();
 }

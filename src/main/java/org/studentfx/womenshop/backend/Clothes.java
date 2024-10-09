@@ -1,12 +1,11 @@
+package org.studentfx.womenshop.backend;
+
 public class Clothes extends Product {
     private int size;
 
     public Clothes(String name, double purchasePrice, double sellPrice, int size) {
         super(name, purchasePrice, sellPrice);
-        if (size < 34 || size > 54 || size % 2 != 0) {
-            throw new IllegalArgumentException("Wrong size!");
-        }
-        this.size = size;
+        setSize(size);
     }
 
     public int getSize() {
@@ -15,14 +14,9 @@ public class Clothes extends Product {
 
     public void setSize(int size) {
         if (size < 34 || size > 54 || size % 2 != 0) {
-            throw new IllegalArgumentException("Wrong size!");
+            throw new IllegalArgumentException("Wrong size! Size should be between 34 and 54 and even.");
         }
         this.size = size;
-    }
-
-    @Override
-    public void applyDiscount() {
-        this.discountPrice = this.sellPrice * 0.70; // 30% discount
     }
 
     @Override

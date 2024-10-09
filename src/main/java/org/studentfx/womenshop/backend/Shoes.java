@@ -1,12 +1,11 @@
+package org.studentfx.womenshop.backend;
+
 public class Shoes extends Product {
     private int shoeSize;
 
     public Shoes(String name, double purchasePrice, double sellPrice, int shoeSize) {
         super(name, purchasePrice, sellPrice);
-        if (shoeSize < 36 || shoeSize > 50) {
-            throw new IllegalArgumentException("Wrong shoe size!");
-        }
-        this.shoeSize = shoeSize;
+        setShoeSize(shoeSize);
     }
 
     public int getShoeSize() {
@@ -15,14 +14,9 @@ public class Shoes extends Product {
 
     public void setShoeSize(int shoeSize) {
         if (shoeSize < 36 || shoeSize > 50) {
-            throw new IllegalArgumentException("Wrong shoe size!");
+            throw new IllegalArgumentException("Wrong shoe size! Shoe size should be between 36 and 50.");
         }
         this.shoeSize = shoeSize;
-    }
-
-    @Override
-    public void applyDiscount() {
-        this.discountPrice = this.sellPrice * 0.80;
     }
 
     @Override

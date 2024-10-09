@@ -7,4 +7,5 @@ module org.studentfx.womenshop {
 
     opens org.studentfx.womenshop to javafx.fxml;
     exports org.studentfx.womenshop;
+    requires java.sql;
 }
