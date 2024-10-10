@@ -50,7 +50,18 @@ public abstract class Product implements Discount, Comparable<Product> {
     }
 
     public int getNbItems() {
-        return nbItems;
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement("SELECT stock FROM Product WHERE name = ?")) {
+            stmt.setString(1, this.name);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                this.nbItems = rs.getInt("stock");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return this.nbItems;
     }
 
     public int getProductId() {
@@ -94,7 +105,7 @@ public abstract class Product implements Discount, Comparable<Product> {
             throw new IllegalArgumentException("Negative price!");
         }
         this.sellPrice = sellPrice;
-        updateSellPriceInDatabase();
+        updateSellPriceAndDiscountInDatabase();
     }
 
     public void setNbItems(int nbItems) {
@@ -128,20 +139,34 @@ public abstract class Product implements Discount, Comparable<Product> {
         if (discountPercentage > 0 && discountPercentage <= 100) {
             this.discountPrice = discountPercentage;
             this.sellPrice = this.sellPrice * (1 - discountPercentage / 100);
-            updateSellPriceInDatabase();
+            updateSellPriceAndDiscountInDatabase();
         }
     }
 
     @Override
     public void removeDiscount() {
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement("SELECT discount_price FROM Product WHERE name = ?")) {
+            stmt.setString(1, this.name);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                this.discountPrice = rs.getDouble("discount_price");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
         if (this.discountPrice > 0) {
-            this.sellPrice = this.sellPrice / (1 - this.discountPrice / 100);
+            this.sellPrice = this.sellPrice / (1 - (this.discountPrice / 100));
             this.discountPrice = 0;
-            updateSellPriceInDatabase();
+            updateSellPriceAndDiscountInDatabase();
+            System.out.println("Discount removed. Restored selling price: " + this.sellPrice);
+        } else {
+            System.out.println("No discount to remove.");
         }
     }
-
-    @Override
+@Override
     public int compareTo(Product otherProduct) {
         return Double.compare(this.sellPrice, otherProduct.sellPrice);
     }
@@ -214,17 +239,19 @@ public abstract class Product implements Discount, Comparable<Product> {
         }
     }
 
-    protected void updateSellPriceInDatabase() {
+    private void updateSellPriceAndDiscountInDatabase() {
         try (Connection conn = DatabaseManager.getConnection()) {
-            String sql = "UPDATE Product SET price = ? WHERE name = ?";
+            String sql = "UPDATE Product SET price = ?, discount_price = ? WHERE name = ?";
             PreparedStatement stmt = conn.prepareStatement(sql);
             stmt.setDouble(1, this.sellPrice);
-            stmt.setString(2, this.name);
+            stmt.setDouble(2, this.discountPrice);
+            stmt.setString(3, this.name);
             stmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
+
 
     public static Product getProductByName(String name) {
         try (Connection conn = DatabaseManager.getConnection()) {
@@ -237,35 +264,33 @@ public abstract class Product implements Discount, Comparable<Product> {
                 String productName = rs.getString("name");
                 double costPrice = rs.getDouble("cost_price");
                 double sellPrice = rs.getDouble("price");
+                double discountPrice = rs.getDouble("discount_price"); // Récupérer la remise
                 int stock = rs.getInt("stock");
                 int categoryId = rs.getInt("category_id");
 
                 Product product;
-                if (categoryId == 1) { // Shoes
+                if (categoryId == 1) {
                     int shoeSize = rs.getInt("shoe_size");
                     product = new Shoes(productName, costPrice, sellPrice, shoeSize);
-                } else if (categoryId == 2) { // Clothes
+                } else if (categoryId == 2) {
                     int clothingSize = rs.getInt("clothing_size");
                     product = new Clothes(productName, costPrice, sellPrice, clothingSize);
-                } else { // Accessories
+                } else {
                     product = new Accessories(productName, costPrice, sellPrice);
                 }
+
                 product.setNbItems(stock);
+                product.discountPrice = discountPrice;
+                System.out.println("Produit récupéré : " + productName + ", Stock : " + stock);
+
                 return product;
+            } else {
+                System.out.println("Produit non trouvé dans la base de données : " + name);
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return null;
-    }
-
-    private static boolean hasColumn(ResultSet rs, String columnName) {
-        try {
-            rs.findColumn(columnName);
-            return true;
-        } catch (SQLException e) {
-            return false;
-        }
     }
 
     public static Product getProductByNameAndSize(String name, Integer shoeSize, Integer clothingSize) {
@@ -303,7 +328,6 @@ public abstract class Product implements Discount, Comparable<Product> {
 
         return null;
     }
-
 
     public void deleteFromDatabase() {
         try (Connection conn = DatabaseManager.getConnection()) {

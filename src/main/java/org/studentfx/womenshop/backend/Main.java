@@ -8,9 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
-import static org.studentfx.womenshop.backend.Product.getProductByNameAndSize;
-
-
 public class Main {
 
     public static void main(String[] args) {
@@ -39,7 +36,7 @@ public class Main {
 
             switch (choice) {
                 case 1:
-                    addProduct(scanner);
+                    addProduct(scanner, finance);
                     break;
                 case 2:
                     modifyStock(scanner, true);
@@ -75,7 +72,7 @@ public class Main {
         scanner.close();
     }
 
-    private static void addProduct(Scanner scanner) {
+    private static void addProduct(Scanner scanner, Finance finance) {
         System.out.println("\n=== Add a New Product ===");
         System.out.print("Enter product name: ");
         String name = scanner.nextLine();
@@ -91,6 +88,10 @@ public class Main {
         System.out.println("3. Accessories");
         System.out.print("Enter your choice: ");
         int choice = scanner.nextInt();
+        scanner.nextLine();
+
+        System.out.print("Enter initial stock quantity: ");
+        int initialStock = scanner.nextInt();
         scanner.nextLine();
 
         Product product;
@@ -115,8 +116,20 @@ public class Main {
                 return;
         }
 
+        product.setNbItems(initialStock);
         product.saveToDatabase();
         System.out.println("Product added successfully: " + product);
+
+        double totalCost = purchasePrice * initialStock;
+
+
+        Transaction transaction = new Transaction(product.getProductId(), "purchase", initialStock, product.getPurchasePrice());
+        transaction.saveToDatabase();
+
+        finance.addCost(totalCost);
+        updateFinancialsInDatabase(finance);
+
+        System.out.println("Financial data updated: Total Cost added = " + totalCost);
     }
 
 
@@ -153,6 +166,8 @@ public class Main {
         Product product = Product.getProductByNameAndSize(name, shoeSize, clothingSize);
         if (product != null) {
             int currentStock = product.getNbItems();
+            System.out.println("Stock actuel : " + currentStock);
+
             int newStock = addStock ? currentStock + quantity : currentStock - quantity;
 
             if (newStock < 0) {
@@ -160,16 +175,16 @@ public class Main {
                 return;
             }
 
-            System.out.println("Attempting to update stock for: " + name + ", New Stock: " + newStock);
-
             if (shoeSize != null) {
                 updateStockInDatabase(name, shoeSize, null, newStock);
             } else if (clothingSize != null) {
                 updateStockInDatabase(name, null, clothingSize, newStock);
+            } else {
+                updateStockInDatabase(name, null, null, newStock);
             }
 
-            product.setNbItems(newStock); // Mise à jour de l'objet produit local => Corriger les stocks de 2 produits de meme nom qui s'update meme si c'est le stock de 1 seul (size)
-            System.out.println("Stock " + (addStock ? "added." : "removed.") + " Updated product: " + product);
+            product.setNbItems(newStock);
+            System.out.println("Stock " + (addStock ? "added." : "removed.") + ". Updated product: " + product);
         } else {
             System.out.println("Product not found.");
         }
@@ -251,12 +266,16 @@ public class Main {
             int newStock = product.getNbItems() + quantity;
 
             updateStockInDatabase(name, shoeSize, clothingSize, newStock);
+
             product.setNbItems(newStock);
 
             Transaction transaction = new Transaction(product.getProductId(), "purchase", quantity, product.getPurchasePrice());
             transaction.saveToDatabase();
+
             finance.addCost(totalCost);
             updateFinancialsInDatabase(finance);
+
+            System.out.println("Product purchased successfully. New stock: " + newStock);
         } else {
             System.out.println("Product not found.");
         }
@@ -352,24 +371,20 @@ public class Main {
         List<Product> accessoriesList = new ArrayList<>();
 
         try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement("SELECT name, category_id, price, stock, shoe_size, clothing_size FROM Product");
+             PreparedStatement stmt = conn.prepareStatement("SELECT name, category_id, price, discount_price, stock, shoe_size, clothing_size FROM Product");
              ResultSet rs = stmt.executeQuery()) {
 
             while (rs.next()) {
                 String name = rs.getString("name");
                 int categoryId = rs.getInt("category_id");
                 double price = rs.getDouble("price");
+                double discountPrice = rs.getDouble("discount_price");
                 int stock = rs.getInt("stock");
 
                 Product product;
                 switch (categoryId) {
                     case 1:
                         int shoeSize = rs.getInt("shoe_size");
-
-                        if (shoeSize < 36 || shoeSize > 50) {
-                            System.out.println("Invalid shoe size for product: " + name + ". Size should be between 36 and 50.");
-                            shoeSize = 36;
-                        }
                         product = new Shoes(name, price, price, shoeSize);
                         product.setNbItems(stock);
                         shoesList.add(product);
@@ -388,28 +403,9 @@ public class Main {
                     default:
                         System.out.println("Unknown category for product: " + name);
                 }
-            }
 
-            if (!shoesList.isEmpty()) {
-                System.out.println("\n--- Shoes ---");
-                for (Product shoe : shoesList) {
-                    Shoes s = (Shoes) shoe;
-                    System.out.printf("Product: %s, Price: %.2f, Stock: %d, Shoe Size: %d%n", s.getName(), s.getSellPrice(), s.getNbItems(), s.getShoeSize());
-                }
-            }
-
-            if (!clothesList.isEmpty()) {
-                System.out.println("\n--- Clothes ---");
-                for (Product clothing : clothesList) {
-                    Clothes c = (Clothes) clothing;
-                    System.out.printf("Product: %s, Price: %.2f, Stock: %d, Size: %d%n", c.getName(), c.getSellPrice(), c.getNbItems(), c.getSize());
-                }
-            }
-
-            if (!accessoriesList.isEmpty()) {
-                System.out.println("\n--- Accessories ---");
-                for (Product accessory : accessoriesList) {
-                    System.out.printf("Product: %s, Price: %.2f, Stock: %d%n", accessory.getName(), accessory.getSellPrice(), accessory.getNbItems());
+                if (categoryId == 3) {
+                    System.out.printf("Product: %s, Price: %.2f, Discount Price: %.2f, Stock: %d%n", name, price, discountPrice, stock);
                 }
             }
 
@@ -468,5 +464,4 @@ public class Main {
             e.printStackTrace();
         }
     }
-
 }
