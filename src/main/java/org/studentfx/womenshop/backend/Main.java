@@ -366,9 +366,9 @@ public class Main {
     private static void viewStock() {
         System.out.println("\n=== Current Stock by Product Type ===");
 
-        List<Product> shoesList = new ArrayList<>();
-        List<Product> clothesList = new ArrayList<>();
-        List<Product> accessoriesList = new ArrayList<>();
+        boolean shoesHeaderPrinted = false;
+        boolean clothesHeaderPrinted = false;
+        boolean accessoriesHeaderPrinted = false;
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement("SELECT name, category_id, price, discount_price, stock, shoe_size, clothing_size FROM Product");
@@ -384,28 +384,39 @@ public class Main {
                 Product product;
                 switch (categoryId) {
                     case 1:
+                        if (!shoesHeaderPrinted) {
+                            System.out.println("\n--- Shoes ---");
+                            shoesHeaderPrinted = true;
+                        }
                         int shoeSize = rs.getInt("shoe_size");
-                        product = new Shoes(name, price, price, shoeSize);
+                        product = new Shoes(name, price, discountPrice, shoeSize);
                         product.setNbItems(stock);
-                        shoesList.add(product);
+                        System.out.printf("Product: %s, Price: %.2f, Discount Price: %.2f, Stock: %d%n",
+                                name, price, discountPrice, stock);
                         break;
                     case 2:
+                        if (!clothesHeaderPrinted) {
+                            System.out.println("\n--- Clothes ---");
+                            clothesHeaderPrinted = true;
+                        }
                         int clothingSize = rs.getInt("clothing_size");
-                        product = new Clothes(name, price, price, clothingSize);
+                        product = new Clothes(name, price, discountPrice, clothingSize);
                         product.setNbItems(stock);
-                        clothesList.add(product);
+                        System.out.printf("Product: %s, Price: %.2f, Discount Price: %.2f, Stock: %d%n",
+                                name, price, discountPrice, stock);
                         break;
                     case 3:
-                        product = new Accessories(name, price, price);
+                        if (!accessoriesHeaderPrinted) {
+                            System.out.println("\n--- Accessories ---");
+                            accessoriesHeaderPrinted = true;
+                        }
+                        product = new Accessories(name, price, discountPrice);
                         product.setNbItems(stock);
-                        accessoriesList.add(product);
+                        System.out.printf("Product: %s, Price: %.2f, Discount Price: %.2f, Stock: %d%n",
+                                name, price, discountPrice, stock);
                         break;
                     default:
                         System.out.println("Unknown category for product: " + name);
-                }
-
-                if (categoryId == 3) {
-                    System.out.printf("Product: %s, Price: %.2f, Discount Price: %.2f, Stock: %d%n", name, price, discountPrice, stock);
                 }
             }
 
